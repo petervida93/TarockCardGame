@@ -81,13 +81,17 @@ class GameController {
     
     const game = {
       id: gameId,
-      status: 'waiting', // waiting, bidding, exchanging, playing, finished
+      status: 'waiting', // waiting, bidding, calling, exchanging, playing, finished
       dealerIndex: 0,
       currentPlayerIndex: 0, // Az első játékos (host) kezd
       currentBid: null,
       lastBidder: null,
       biddingWinner: null,
       consecutivePasses: 0,
+      calledCard: null, // Meghívott tarokk (pl. {suit: 'tarock', value: 20})
+      partnerPlayerIndex: null, // Csapattárs indexe (amikor kiderül)
+      teams: { good: [], bad: [] }, // Jópajtások és rosszpajtások
+      announcements: [], // Bemondások: [{type, value(color for ulti), playerIndex, fulfilled, points}]
       players: [
         { 
           id: 0, 
@@ -354,11 +358,153 @@ class GameController {
     });
     
     if (allDiscarded) {
-      game.status = 'playing';
-      game.currentPlayerIndex = 0; // Az első játékos kezdi a playing fázist
+      game.status = 'calling'; // Csapattárs meghívása
+      game.currentPlayerIndex = game.biddingWinner; // A licitet nyerő hívja meg
     }
     
     return { success: true, game, allDiscarded };
+  }
+
+  // Csapattárs meghívása
+  callPartner(gameId, playerIndex, calledTarockValue) {
+    const game = this.games.get(gameId);
+    if (!game) return { success: false, error: 'Game not found' };
+    
+    if (game.status !== 'calling') {
+      return { success: false, error: 'Not in calling phase' };
+    }
+    
+    if (playerIndex !== game.biddingWinner) {
+      return { success: false, error: 'Only the bidding winner can call a partner' };
+    }
+    
+    // Ha null, akkor nincs hívható tarokk, egyedül játszik
+    if (calledTarockValue === null) {
+      game.calledCard = null;
+      game.partnerPlayerIndex = null;
+      game.teams.good = [game.biddingWinner];
+      game.teams.bad = [];
+      for (let i = 0; i < 4; i++) {
+        if (i !== game.biddingWinner) {
+          game.teams.bad.push(i);
+        }
+      }
+      // Egyedül játék esetén is maradunk calling státuszban a bemondások miatt
+      return { success: true, game };
+    }
+    
+    // Ellenőrizzük, hogy érvényes-e a hívott tarokk (20, 19, 18, 17, 16)
+    if (![20, 19, 18, 17, 16].includes(calledTarockValue)) {
+      return { success: false, error: 'Invalid tarock value for calling' };
+    }
+    
+    game.calledCard = { suit: 'tarock', value: calledTarockValue };
+    
+    // Keressük meg, kinél van ez a kártya
+    const partnerIndex = game.hands.findIndex((hand, idx) => 
+      idx !== playerIndex && hand.some(card => 
+        card.suit === 'tarock' && card.value === calledTarockValue
+      )
+    );
+    
+    // Ha a hívásnál a hívott kártya a hívónál van, akkor később derül ki
+    // (amikor valaki játssza le)
+    if (partnerIndex !== -1) {
+      game.partnerPlayerIndex = partnerIndex;
+    }
+    
+    // Beállítjuk a csapatokat (egyelőre csak a hívó biztos)
+    game.teams.good = [game.biddingWinner];
+    if (game.partnerPlayerIndex !== null) {
+      game.teams.good.push(game.partnerPlayerIndex);
+    }
+    
+    // Rosszpajtások
+    game.teams.bad = [];
+    for (let i = 0; i < 4; i++) {
+      if (i !== game.biddingWinner && i !== game.partnerPlayerIndex) {
+        game.teams.bad.push(i);
+      }
+    }
+    
+    // Maradunk calling státuszban a bemondások miatt
+    // A játék csak a finishCalling után kezdődik
+    
+    return { success: true, game };
+  }
+
+  // Bemondás hozzáadása
+  makeAnnouncement(gameId, playerIndex, announcement) {
+    const game = this.games.get(gameId);
+    if (!game) return { success: false, error: 'Game not found' };
+    
+    if (game.status !== 'calling') {
+      return { success: false, error: 'Can only make announcements during calling phase' };
+    }
+    
+    // Validálás: csak a hívó (biddingWinner) mondhat be
+    if (playerIndex !== game.biddingWinner) {
+      return { success: false, error: 'Only the bidding winner can make announcements' };
+    }
+    
+    // Announcement típusok: negykiraly, tuletroa, duplajat, pagat_ulti, sas_ulti, kiraly_ulti, pagat_uhu, sas_uhu, kiraly_uhu
+    const validTypes = [
+      'negykiraly', 'tuletroa', 'duplajat', 
+      'pagat_ulti', 'sas_ulti', 'kiraly_ulti',
+      'pagat_uhu', 'sas_uhu', 'kiraly_uhu'
+    ];
+    
+    if (!validTypes.includes(announcement.type)) {
+      return { success: false, error: 'Invalid announcement type' };
+    }
+    
+    // Király ulti/uhu esetén kell szín
+    if ((announcement.type === 'kiraly_ulti' || announcement.type === 'kiraly_uhu') && !announcement.suit) {
+      return { success: false, error: 'King ulti/uhu requires a suit' };
+    }
+    
+    // Pontérték meghatározása
+    const points = {
+      'negykiraly': 1,
+      'tuletroa': 1,
+      'duplajat': 2,
+      'pagat_ulti': 10,
+      'sas_ulti': 10,
+      'kiraly_ulti': 15,
+      'pagat_uhu': 8,
+      'sas_uhu': 8,
+      'kiraly_uhu': 12
+    };
+    
+    game.announcements.push({
+      type: announcement.type,
+      suit: announcement.suit || null,
+      playerIndex,
+      fulfilled: null, // Később kerül kiértékelésre
+      points: points[announcement.type]
+    });
+    
+    return { success: true, game };
+  }
+
+  // Calling fázis befejezése és játék indítása
+  finishCalling(gameId, playerIndex) {
+    const game = this.games.get(gameId);
+    if (!game) return { success: false, error: 'Game not found' };
+    
+    if (game.status !== 'calling') {
+      return { success: false, error: 'Not in calling phase' };
+    }
+    
+    if (playerIndex !== game.biddingWinner) {
+      return { success: false, error: 'Only the bidding winner can finish calling' };
+    }
+    
+    // Játék indítása
+    game.status = 'playing';
+    game.currentPlayerIndex = 0; // Az első játékos kezdi
+    
+    return { success: true, game };
   }
 
   // Játék a játék fázisban
@@ -400,6 +546,8 @@ class GameController {
       // 9 ütés = játék vége
       if (game.tricks.length === 9) {
         game.status = 'finished';
+        // Bemondások ellenőrzése
+        this.checkAnnouncements(gameId);
       }
       
       return { success: true, trickComplete: true, winner, game };
@@ -493,6 +641,158 @@ class GameController {
     const game = this.games.get(gameId);
     if (!game) return null;
     return game.hands[playerIndex];
+  }
+
+  // Bemondások ellenőrzése játék végén
+  checkAnnouncements(gameId) {
+    const game = this.games.get(gameId);
+    if (!game || game.announcements.length === 0) return;
+
+    game.announcements.forEach(announcement => {
+      switch (announcement.type) {
+        case 'negykiraly':
+          announcement.fulfilled = this.checkNegykiraly(game);
+          break;
+        case 'tuletroa':
+          announcement.fulfilled = this.checkTuletroa(game);
+          break;
+        case 'duplajat':
+          announcement.fulfilled = this.checkDuplajat(game);
+          break;
+        case 'pagat_ulti':
+          announcement.fulfilled = this.checkUlti(game, 1);
+          break;
+        case 'sas_ulti':
+          announcement.fulfilled = this.checkUlti(game, 21);
+          break;
+        case 'kiraly_ulti':
+          announcement.fulfilled = this.checkKiralyUlti(game, announcement.suit);
+          break;
+        case 'pagat_uhu':
+          announcement.fulfilled = this.checkUhu(game, 1);
+          break;
+        case 'sas_uhu':
+          announcement.fulfilled = this.checkUhu(game, 21);
+          break;
+        case 'kiraly_uhu':
+          announcement.fulfilled = this.checkKiralyUhu(game, announcement.suit);
+          break;
+      }
+    });
+  }
+
+  // Négy király ellenőrzése: A jópajtások megütötték-e mind a 4 királyt
+  checkNegykiraly(game) {
+    const suits = ['clubs', 'diamonds', 'hearts', 'spades'];
+    const kingsWon = suits.every(suit => {
+      // Keressük meg, melyik ütésben van az adott színű 5-ös (király)
+      const trickWithKing = game.tricks.find(trick => 
+        trick.cards.some(play => play.card.suit === suit && play.card.value === 5)
+      );
+      
+      if (!trickWithKing) return false; // Ha nincs ilyen ütés (nem lehet)
+      
+      // Ellenőrizzük, hogy a győztes a jópajtások közé tartozott-e
+      return game.teams.good.includes(trickWithKing.winner);
+    });
+    
+    return kingsWon;
+  }
+
+  // Túlütőroa: A jópajtások megütötték-e mind a 3 nagy tarokkot (I, XXI, XXII)
+  checkTuletroa(game) {
+    const honors = [1, 21, 22];
+    const honorsWon = honors.every(value => {
+      const trickWithHonor = game.tricks.find(trick =>
+        trick.cards.some(play => play.card.suit === 'tarock' && play.card.value === value)
+      );
+      
+      if (!trickWithHonor) return false;
+      
+      return game.teams.good.includes(trickWithHonor.winner);
+    });
+    
+    return honorsWon;
+  }
+
+  // Dupla játék: A jópajtások legalább 2x annyi partot szereztek, mint a rosszpajtások
+  checkDuplajat(game) {
+    let goodTeamPoints = 0;
+    let badTeamPoints = 0;
+    
+    game.tricks.forEach(trick => {
+      const points = trick.cards.reduce((sum, play) => sum + this.getCardValue(play.card), 0);
+      
+      if (game.teams.good.includes(trick.winner)) {
+        goodTeamPoints += points;
+      } else {
+        badTeamPoints += points;
+      }
+    });
+    
+    return goodTeamPoints >= badTeamPoints * 2;
+  }
+
+  // Ulti ellenőrzése (utolsó ütésben): A megadott tarokk (1=Pagát, 21=Sas) nyer-e az utolsó ütésben
+  checkUlti(game, tarockValue) {
+    if (game.tricks.length < 9) return false;
+    
+    const lastTrick = game.tricks[8]; // Az utolsó (9.) ütés
+    
+    // Keressük meg, melyik játékos játszotta ki ezt a tarokkot
+    const playWithCard = lastTrick.cards.find(play =>
+      play.card.suit === 'tarock' && play.card.value === tarockValue
+    );
+    
+    if (!playWithCard) return false; // Ha nem volt az ütésben
+    
+    // Ellenőrizzük, hogy ez a játékos nyerte-e az ütést
+    return lastTrick.winner === playWithCard.playerIndex;
+  }
+
+  // Király ulti ellenőrzése: A megadott színű király nyer-e az utolsó ütésben
+  checkKiralyUlti(game, suit) {
+    if (game.tricks.length < 9) return false;
+    
+    const lastTrick = game.tricks[8];
+    
+    const playWithKing = lastTrick.cards.find(play =>
+      play.card.suit === suit && play.card.value === 5
+    );
+    
+    if (!playWithKing) return false;
+    
+    return lastTrick.winner === playWithKing.playerIndex;
+  }
+
+  // Uhu ellenőrzése (utolsó előtti ütésben): A megadott tarokk nyer-e az utolsó előtti ütésben
+  checkUhu(game, tarockValue) {
+    if (game.tricks.length < 8) return false;
+    
+    const secondLastTrick = game.tricks[7]; // Az utolsó előtti (8.) ütés
+    
+    const playWithCard = secondLastTrick.cards.find(play =>
+      play.card.suit === 'tarock' && play.card.value === tarockValue
+    );
+    
+    if (!playWithCard) return false;
+    
+    return secondLastTrick.winner === playWithCard.playerIndex;
+  }
+
+  // Király uhu ellenőrzése: A megadott színű király nyer-e az utolsó előtti ütésben
+  checkKiralyUhu(game, suit) {
+    if (game.tricks.length < 8) return false;
+    
+    const secondLastTrick = game.tricks[7];
+    
+    const playWithKing = secondLastTrick.cards.find(play =>
+      play.card.suit === suit && play.card.value === 5
+    );
+    
+    if (!playWithKing) return false;
+    
+    return secondLastTrick.winner === playWithKing.playerIndex;
   }
 }
 

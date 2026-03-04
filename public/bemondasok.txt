@@ -1,0 +1,34 @@
+Bemondások:
+
+Licitáló játékos ezeket mondhatja:
+
+1. Négy király:
+	Jelzés: a hívott lap (általában 20-as tarokk) alatti lap nálam van (19-es) és egy nagy honőr (22, vagy 21)
+	Vállalás: Jópajtások mind a négy királyt elviszik az ütéseikben.
+	Pont érték: 1
+	
+2. Tuletróá:
+	Jelzés: Két nagy honőr nálam van, (22,21) vagy csak az egyik, de már a partner jelezte a másikat 
+	Vállalás: Mindhárom honőrt el kell vinnie a jópajtásoknak ütéseikkel
+	Pont érték: 1
+	
+3. Dupla játék
+	Jelzés: a hívott lap (általában 20-as tarokk) alatt 2-vel lévő lap nálam van (18-as) és egy nagy honőr (22, vagy 21)
+	Vállalás: Jópajtások partipontjai legalább 2x annyi mint a rosszpajtásoké. Ez azt jelenti hogy rossz pajtások maximum 23-at vihetnek.
+	Pont érték: 2
+	
+4. Ulti
+	4.1 Pagát ulti:
+	Jelzés: Pagát (1-es tarokk) nálam van és sok tarokk
+	Vállalás: Utolsó ütést pagáttal (1-es tarokkal) viszem (ezt rosszpajtásként is megjátszhatom)
+	Pont érték: 10
+	4.2 Sas ulti: 
+	Ugyanaz mint a pagát ulti csak a 2-es tarokkal
+	4.3 Király ulti:
+	Ugyanaz mint a pagát ulti csak egy megnevezett színű királlyal. értéke 15 pont
+	
+5. Uhu
+	4.1 Pagát uhu:
+	ugyanaz mint a pagát ulti, csak nem az utolsó ütésre hanem a 8. ütésre vonatkozik
+	4.2 Sas uhu: Ugyanaz mint a pagát uhu csak sassal (2-es tarokk) kell a 8. ütést vinnem
+	4.3 Király uhu: Ugyanaz mint a pagát uhu, csak megnevezett színű királlyal kell vinnem a 8. ütést

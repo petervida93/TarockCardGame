@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-const BiddingPanel = ({ currentBid, onBid, isPlayerTurn, biddingHistory = [], playerHasHonor = false }) => {
+const BiddingPanel = ({ currentBid, onBid, isPlayerTurn, biddingHistory = [], playerHasHonor = false, playerIndex }) => {
   const historyEndRef = useRef(null);
   
   // Auto-scroll a történet végére
@@ -15,9 +16,9 @@ const BiddingPanel = ({ currentBid, onBid, isPlayerTurn, biddingHistory = [], pl
     { name: 'Szóló', value: 0, description: '0 lap a talonból' }
   ];
 
-  // Ellenőrzi, hogy a játékos (player 0) passzolt-e már
+  // Ellenőrzi, hogy a játékos passzolt-e már
   const hasPlayerPassed = () => {
-    return biddingHistory.some(entry => entry.playerIndex === 0 && entry.action === 'pass');
+    return biddingHistory.some(entry => entry.playerIndex === playerIndex && entry.action === 'pass');
   };
 
   const canBid = (bidValue) => {
@@ -152,6 +153,22 @@ const BiddingPanel = ({ currentBid, onBid, isPlayerTurn, biddingHistory = [], pl
       )}
     </div>
   );
+};
+
+BiddingPanel.propTypes = {
+  currentBid: PropTypes.number,
+  onBid: PropTypes.func.isRequired,
+  isPlayerTurn: PropTypes.bool.isRequired,
+  biddingHistory: PropTypes.arrayOf(
+    PropTypes.shape({
+      player: PropTypes.string,
+      action: PropTypes.string,
+      value: PropTypes.number,
+      playerIndex: PropTypes.number
+    })
+  ),
+  playerHasHonor: PropTypes.bool,
+  playerIndex: PropTypes.number.isRequired
 };
 
 export default BiddingPanel;

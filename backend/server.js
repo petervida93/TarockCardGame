@@ -180,6 +180,65 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Csapattárs meghívása (calling fázis)
+  socket.on('call_partner', ({ gameId, playerIndex, calledTarockValue }) => {
+    try {
+      const result = gameController.callPartner(gameId, playerIndex, calledTarockValue);
+      
+      if (!result.success) {
+        socket.emit('error', { message: result.error });
+        return;
+      }
+      
+      io.to(gameId).emit('partner_called', { 
+        calledTarockValue,
+        calledCard: result.game.calledCard
+      });
+      broadcastGameStateToAll(gameId);
+    } catch (error) {
+      console.error('Error calling partner:', error);
+      socket.emit('error', { message: 'Failed to call partner' });
+    }
+  });
+
+  // Bemondás (calling fázis)
+  socket.on('make_announcement', ({ gameId, playerIndex, announcement }) => {
+    try {
+      const result = gameController.makeAnnouncement(gameId, playerIndex, announcement);
+      
+      if (!result.success) {
+        socket.emit('error', { message: result.error });
+        return;
+      }
+      
+      io.to(gameId).emit('announcement_made', { 
+        announcement: result.game.announcements[result.game.announcements.length - 1]
+      });
+      broadcastGameStateToAll(gameId);
+    } catch (error) {
+      console.error('Error making announcement:', error);
+      socket.emit('error', { message: 'Failed to make announcement' });
+    }
+  });
+
+  // Calling fázis befejezése és játék indítása
+  socket.on('finish_calling', ({ gameId, playerIndex }) => {
+    try {
+      const result = gameController.finishCalling(gameId, playerIndex);
+      
+      if (!result.success) {
+        socket.emit('error', { message: result.error });
+        return;
+      }
+      
+      io.to(gameId).emit('game_started_playing', {});
+      broadcastGameStateToAll(gameId);
+    } catch (error) {
+      console.error('Error finishing calling:', error);
+      socket.emit('error', { message: 'Failed to finish calling' });
+    }
+  });
+
   // Kártyajátszás (playing fázis)
   socket.on('play_card', ({ gameId, playerIndex, card }) => {
     try {

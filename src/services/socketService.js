@@ -90,6 +90,32 @@ class SocketService {
     });
   }
 
+  // Csapattárs meghívása (calling)
+  callPartner(calledTarockValue) {
+    this.socket.emit('call_partner', {
+      gameId: this.gameId,
+      playerIndex: this.playerIndex,
+      calledTarockValue
+    });
+  }
+
+  // Bemondás (calling)
+  makeAnnouncement(announcement) {
+    this.socket.emit('make_announcement', {
+      gameId: this.gameId,
+      playerIndex: this.playerIndex,
+      announcement
+    });
+  }
+
+  // Calling fázis befejezése
+  finishCalling() {
+    this.socket.emit('finish_calling', {
+      gameId: this.gameId,
+      playerIndex: this.playerIndex
+    });
+  }
+
   // Kártya játszása
   playCard(card) {
     this.socket.emit('play_card', {
@@ -130,6 +156,14 @@ class SocketService {
 
   onCardsDiscarded(callback) {
     this.socket.on('cards_discarded', callback);
+  }
+
+  onPartnerCalled(callback) {
+    this.socket.on('partner_called', callback);
+  }
+
+  onAnnouncementMade(callback) {
+    this.socket.on('announcement_made', callback);
   }
 
   onGameFinished(callback) {

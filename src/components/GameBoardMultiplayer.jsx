@@ -4,6 +4,7 @@ import Player from './Player';
 import Hand from './Hand';
 import Talon from './Talon';
 import BiddingPanel from './BiddingPanel';
+import CallingPanel from './CallingPanel';
 import Card from './Card';
 
 const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) => {
@@ -21,6 +22,8 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
     socketService.onPlayerDisconnected(handlePlayerDisconnected);
     socketService.onCardPlayed(handleCardPlayed);
     socketService.onCardsDiscarded(handleCardsDiscarded);
+    socketService.onPartnerCalled(handlePartnerCalled);
+    socketService.onAnnouncementMade(handleAnnouncementMade);
     socketService.onGameFinished(handleGameFinished);
     socketService.onNewDealRequired(handleNewDealRequired);
 
@@ -56,6 +59,14 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
     console.log(`Player ${discardedIndex} discarded cards`);
   };
 
+  const handlePartnerCalled = ({ calledTarockValue, calledCard }) => {
+    console.log(`Partner called: ${calledTarockValue}-as tarokk`, calledCard);
+  };
+
+  const handleAnnouncementMade = ({ announcement }) => {
+    console.log('Announcement made:', announcement);
+  };
+
   const handleGameFinished = ({ scores }) => {
     console.log('Game finished! Scores:', scores);
   };
@@ -70,6 +81,26 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
   // Licitálás
   const handleBid = (action, value) => {
     socketService.bid(action, value);
+  };
+
+  // Csapattárs meghívása
+  const handleCallPartner = (calledTarockValue) => {
+    if (calledTarockValue === null) {
+      // Nincs hívható tarokk, egyedül játszik
+      // TODO: ezt kezelni kell a backend-en is
+      return;
+    }
+    socketService.callPartner(calledTarockValue);
+  };
+
+  // Bemondás
+  const handleMakeAnnouncement = (announcement) => {
+    socketService.makeAnnouncement(announcement);
+  };
+
+  // Bemondások befejezése - játék indítása
+  const handleFinishCalling = () => {
+    socketService.finishCalling();
   };
 
   // Kártyalerakás (exchanging)
@@ -166,9 +197,9 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
 
   // Scores számítás
   const calculateScores = () => {
-    if (!game.tricks) return [0, 0, 0, 0];
+    if (!game.tricks) return { individual: [0, 0, 0, 0], teams: { good: 0, bad: 0 } };
     
-    const scores = [0, 0, 0, 0];
+    const individual = [0, 0, 0, 0];
     game.tricks.forEach(trick => {
       const winner = trick.winner;
       trick.cards.forEach(play => {
@@ -179,11 +210,34 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
         } else {
           value = card.value;
         }
-        scores[winner] += value;
+        individual[winner] += value;
       });
     });
     
-    return scores;
+    // Csapatok szerinti összesítés
+    const teams = { good: 0, bad: 0 };
+    if (game.teams?.good && game.teams?.bad) {
+      game.teams.good.forEach(playerIdx => {
+        teams.good += individual[playerIdx];
+      });
+      game.teams.bad.forEach(playerIdx => {
+        teams.bad += individual[playerIdx];
+      });
+
+      // Bemondások pontjainak hozzáadása/levonása
+      if (game.announcements && game.announcements.length > 0) {
+        game.announcements.forEach(announcement => {
+          if (announcement.fulfilled === true) {
+            teams.good += announcement.points; // Teljesült -> +pont
+          } else if (announcement.fulfilled === false) {
+            teams.good -= announcement.points; // Nem teljesült -> -pont
+          }
+          // Ha null (még nem értékelt), nem változtatunk semmit
+        });
+      }
+    }
+    
+    return { individual, teams };
   };
 
   const togglePlayerExpansion = (index) => {
@@ -335,6 +389,19 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
           isPlayerTurn={game.currentPlayerIndex === playerIndex}
           biddingHistory={game.biddingHistory || []}
           playerHasHonor={players[playerIndex]?.hasHonor || false}
+          playerIndex={playerIndex}
+        />
+      )}
+
+      {/* Calling Panel */}
+      {game.status === 'calling' && (
+        <CallingPanel
+          onCallPartner={handleCallPartner}
+          onMakeAnnouncement={handleMakeAnnouncement}
+          onFinishCalling={handleFinishCalling}
+          isPlayerTurn={game.currentPlayerIndex === playerIndex}
+          playerHand={game.hands?.[playerIndex] || []}
+          biddingWinner={players[game.biddingWinner]?.name || 'Licitet nyerő'}
         />
       )}
 
@@ -347,6 +414,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
           <p>Te vagy: <span className="font-semibold">{playerName}</span></p>
           <p>Fázis: <span className="font-semibold">
             {game.status === 'bidding' ? 'Licitálás' : 
+             game.status === 'calling' ? 'Csapattárs hívás' :
              game.status === 'exchanging' ? 'Csere' : 
              game.status === 'playing' ? 'Játék' : 'Befejezett'}
           </span></p>
@@ -458,6 +526,33 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
       {/* Finished - Final scores */}
       {game.status === 'finished' && (() => {
         const scores = calculateScores();
+        const hasTeams = game.teams?.good && game.teams?.bad && game.teams.good.length > 0;
+        console.log('🏁 Game finished:', { hasTeams, teams: game.teams, announcements: game.announcements });
+        
+        // Csapatok szerinti ütésszám
+        const teamTricks = { good: 0, bad: 0 };
+        if (hasTeams) {
+          game.teams.good.forEach(playerIdx => {
+            teamTricks.good += (game.tricks || []).filter(t => t.winner === playerIdx).length;
+          });
+          game.teams.bad.forEach(playerIdx => {
+            teamTricks.bad += (game.tricks || []).filter(t => t.winner === playerIdx).length;
+          });
+        }
+
+        // Bemondások összegzése
+        const announcementNames = {
+          'negykiraly': 'Négy király',
+          'tuletroa': 'Tuletróá',
+          'duplajat': 'Dupla játék',
+          'pagat_ulti': 'Pagát ulti',
+          'sas_ulti': 'Sas ulti',
+          'kiraly_ulti': 'Király ulti',
+          'pagat_uhu': 'Pagát uhu',
+          'sas_uhu': 'Sas uhu',
+          'kiraly_uhu': 'Király uhu'
+        };
+        const suitNames = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
         
         return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 overflow-y-auto">
@@ -466,18 +561,152 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
               Játék vége - Összesítő
             </h2>
             
+            {/* Csapatok összesítője */}
+            {hasTeams && (
+              <div className="mb-8 space-y-4">
+                {/* Jópajtások */}
+                <div className="bg-green-50 dark:bg-green-950 rounded-xl p-6 border-4 border-green-500">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-green-800 dark:text-green-200">
+                      🤝 Jópajtások
+                    </h3>
+                    <div className="text-right">
+                      <p className="text-4xl font-bold text-green-900 dark:text-green-100">
+                        {scores.teams.good}
+                      </p>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        parti pont
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Játékosok */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-3">
+                    <div className="space-y-2">
+                      {game.teams.good.map(playerIdx => (
+                        <div key={playerIdx} className="flex items-center justify-between text-gray-900 dark:text-white">
+                          <span className="font-semibold">{players[playerIdx].name}</span>
+                          <span className="text-green-600 dark:text-green-400">{scores.individual[playerIdx]} pont</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Összesen • {teamTricks.good} ütés</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">
+                        {game.teams.good.reduce((sum, idx) => sum + scores.individual[idx], 0)} pont
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bemondások */}
+                  {game.announcements && game.announcements.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2">
+                        📢 Vállalások:
+                      </p>
+                      {game.announcements.map((ann, idx) => {
+                        const name = announcementNames[ann.type] || ann.type;
+                        const suitText = ann.suit ? ` ${suitNames[ann.suit]}` : '';
+                        const fulfilled = ann.fulfilled === true;
+                        const checked = ann.fulfilled !== null;
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            className={`p-2 rounded-lg flex items-center justify-between text-sm ${
+                              !checked ? 'bg-gray-100 dark:bg-gray-700' :
+                              fulfilled ? 'bg-green-100 dark:bg-green-900' : 
+                              'bg-red-100 dark:bg-red-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">
+                                {!checked ? '⏳' : fulfilled ? '✅' : '❌'}
+                              </span>
+                              <span className={`font-medium ${
+                                !checked ? 'text-gray-700 dark:text-gray-300' :
+                                fulfilled ? 'text-green-900 dark:text-green-100' : 
+                                'text-red-900 dark:text-red-100'
+                              }`}>
+                                {name}{suitText}
+                              </span>
+                            </div>
+                            <span className={`font-bold ${
+                              !checked ? 'text-gray-600 dark:text-gray-400' :
+                              fulfilled ? 'text-green-700 dark:text-green-300' : 
+                              'text-red-700 dark:text-red-300'
+                            }`}>
+                              {fulfilled || !checked ? '+' : '-'}{ann.points}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {game.calledCard && (
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-3 text-center">
+                      Hívott kártya: {game.calledCard.value}-as tarokk
+                    </p>
+                  )}
+                </div>
+                
+                {/* Rosszpajtások */}
+                <div className="bg-red-50 dark:bg-red-950 rounded-xl p-6 border-4 border-red-500">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-2xl font-bold text-red-800 dark:text-red-200">
+                      ⚔️ Rosszpajtások
+                    </h3>
+                    <div className="text-right">
+                      <p className="text-4xl font-bold text-red-900 dark:text-red-100">
+                        {scores.teams.bad}
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        parti pont
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Játékosok */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                    <div className="space-y-2">
+                      {game.teams.bad.map(playerIdx => (
+                        <div key={playerIdx} className="flex items-center justify-between text-gray-900 dark:text-white">
+                          <span className="font-semibold">{players[playerIdx].name}</span>
+                          <span className="text-red-600 dark:text-red-400">{scores.individual[playerIdx]} pont</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Összesen • {teamTricks.bad} ütés</span>
+                      <span className="font-bold text-red-600 dark:text-red-400">
+                        {game.teams.bad.reduce((sum, idx) => sum + scores.individual[idx], 0)} pont
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Részletes játékos bontás */}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              Részletes bontás:
+            </h3>
             <div className="space-y-4 mb-6">
               {players.map((player, index) => {
-                const playerScore = scores[index];
+                const playerScore = scores.individual[index];
                 const playerTricks = (game.tricks || []).filter(t => t.winner === index);
                 const isExpanded = expandedPlayers.has(index);
+                const isGoodTeam = hasTeams && game.teams.good.includes(index);
                 
                 return (
                   <div 
                     key={player.id}
                     className={`rounded-lg ${
-                      index === game.biddingWinner 
-                        ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500' 
+                      isGoodTeam
+                        ? 'bg-green-100 dark:bg-green-900 border-2 border-green-500' 
+                        : hasTeams 
+                        ? 'bg-red-100 dark:bg-red-900 border-2 border-red-500'
                         : 'bg-gray-100 dark:bg-gray-700'
                     }`}
                   >
