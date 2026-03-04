@@ -124,20 +124,34 @@ class GameController {
     if (!game) return { success: false, error: 'Game not found' };
     
     // Reconnect ellenőrzés: van-e már ilyen nevű játékos aki disconnected?
-    const disconnectedPlayer = game.players.findIndex(p => p.name === playerName && p.disconnected === true);
-    if (disconnectedPlayer !== -1) {
+    const disconnectedPlayerIndex = game.players.findIndex(p => p.name === playerName && p.disconnected === true);
+    if (disconnectedPlayerIndex !== -1) {
       // Reconnect
-      game.players[disconnectedPlayer].disconnected = false;
-      game.players[disconnectedPlayer].socketId = socketId;
-      console.log(`Player ${playerName} reconnected to game ${gameId} as player ${disconnectedPlayer}`);
-      return { success: true, playerIndex: disconnectedPlayer, game, reconnected: true };
+      game.players[disconnectedPlayerIndex].disconnected = false;
+      game.players[disconnectedPlayerIndex].socketId = socketId;
+      console.log(`Player ${playerName} reconnected to game ${gameId} as player ${disconnectedPlayerIndex}`);
+      return { success: true, playerIndex: disconnectedPlayerIndex, game, reconnected: true };
+    }
+    
+    // Ha nem reconnect, ellenőrizzük van-e szabad hely
+    // Szabad hely lehet: waiting státuszban bármelyik üres slot, vagy disconnected játékos
+    const disconnectedSlot = game.players.findIndex(p => p.disconnected === true);
+    
+    if (disconnectedSlot !== -1) {
+      // Van disconnected játékos, új játékos csatlakozik a helyére
+      const oldName = game.players[disconnectedSlot].name;
+      game.players[disconnectedSlot].name = playerName;
+      game.players[disconnectedSlot].disconnected = false;
+      game.players[disconnectedSlot].socketId = socketId;
+      console.log(`Player ${playerName} joined game ${gameId} replacing disconnected player ${oldName} at position ${disconnectedSlot}`);
+      return { success: true, playerIndex: disconnectedSlot, game, replaced: true };
     }
     
     if (game.status !== 'waiting') {
-      return { success: false, error: 'Game already started' };
+      return { success: false, error: 'Game already started and no slots available' };
     }
     
-    // Keressünk szabad helyet
+    // Keressünk szabad helyet waiting játékban
     const emptySlot = game.players.findIndex(p => p.socketId === null && p.id > 0);
     if (emptySlot === -1) {
       return { success: false, error: 'Game is full' };

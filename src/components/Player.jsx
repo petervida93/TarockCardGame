@@ -23,12 +23,9 @@ const Player = ({ player, position, isCurrentPlayer = false }) => {
     <div className={getPositionClasses()}>
       <div className={`relative ${position === 'bottom' || position === 'top' ? 'flex items-center gap-3' : 'flex flex-col items-center gap-2'}`}>
         {/* Avatar */}
-        <div className={`
-          relative
-          ${isCurrentPlayer ? 'ring-4 ring-yellow-400 ring-offset-2 animate-pulse' : 'ring-2 ring-gray-300'}
-        `}>
+        <div className="relative">
           {isCurrentPlayer && (
-            <div className="absolute -inset-1 bg-yellow-400 rounded-full opacity-75 animate-ping" />
+            <div className="absolute -inset-1 bg-yellow-400 rounded-full opacity-75 animate-smooth-ping" />
           )}
           <div className={`
             w-16 h-16 rounded-full 

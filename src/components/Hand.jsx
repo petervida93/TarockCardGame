@@ -29,7 +29,7 @@ const Hand = ({ cards, onCardClick, selectedCards = [], position = 'bottom' }) =
           key={`${card.suit}-${card.value}-${index}`}
           style={{
             marginLeft: (position === 'bottom' || position === 'top') && index > 0 ? '-60px' : '0',
-            marginTop: (position === 'left' || position === 'right') && index > 0 ? '-120px' : '0'
+            marginTop: (position === 'left' || position === 'right') && index > 0 ? '-145px' : '0'
           }}
         >
           <Card

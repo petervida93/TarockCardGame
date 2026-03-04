@@ -44,7 +44,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
     console.log(`${playerName} joined as player ${joinedIndex}`);
   };
 
-  const handlePlayerDisconnected = ({ playerIndex: disconnectedIndex, playerName }) => {
+  const handlePlayerDisconnected = ({ playerName }) => {
     setWaitingMessage(`${playerName} kilépett a játékból`);
   };
 
@@ -63,7 +63,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
   const handleNewDealRequired = ({ message }) => {
     alert(message);
     setTimeout(() => {
-      window.location.reload();
+      globalThis.location.reload();
     }, 2000);
   };
 
@@ -75,7 +75,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
   // Kártyalerakás (exchanging)
   const handleDiscardCards = () => {
     // Ellenőrizzük, hogy már leraktuk-e
-    if (game.playersDiscarded && game.playersDiscarded[playerIndex]) {
+    if (game.playersDiscarded?.[playerIndex]) {
       alert('Már leraktad a kártyáidat!');
       return;
     }
@@ -109,7 +109,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
       if (game.talonDistribution[playerIndex] === 0) return;
       
       // Ellenőrizzük, hogy már leraktuk-e
-      if (game.playersDiscarded && game.playersDiscarded[playerIndex]) return;
+      if (game.playersDiscarded?.[playerIndex]) return;
 
       // Király ellenőrzés
       if (card.suit !== 'tarock' && card.value === 5) {
@@ -373,7 +373,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Játékosok:</p>
             {players.map((player, idx) => {
               const needsToDiscard = game.talonDistribution[idx] > 0;
-              const hasDiscarded = game.playersDiscarded && game.playersDiscarded[idx];
+              const hasDiscarded = game.playersDiscarded?.[idx];
               
               return (
                 <div key={idx} className="flex items-center justify-between text-sm">
@@ -404,11 +404,11 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
           
           <button
             onClick={handleDiscardCards}
-            disabled={selectedCards.length !== game.talonDistribution[playerIndex] || (game.playersDiscarded && game.playersDiscarded[playerIndex])}
+            disabled={selectedCards.length !== game.talonDistribution[playerIndex] || game.playersDiscarded?.[playerIndex]}
             className="w-full px-4 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 
                      disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
           >
-            {game.playersDiscarded && game.playersDiscarded[playerIndex] ? 
+            {game.playersDiscarded?.[playerIndex] ? 
               '✓ Leraktad - Várakozás...' : 
               `Lapok lerakása (${selectedCards.length}/${game.talonDistribution[playerIndex]})`
             }
@@ -436,7 +436,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
             </p>
             {players.map((player, idx) => {
               const needsToDiscard = game.talonDistribution[idx] > 0;
-              const hasDiscarded = game.playersDiscarded && game.playersDiscarded[idx];
+              const hasDiscarded = game.playersDiscarded?.[idx];
               
               return (
                 <div key={idx} className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
@@ -585,7 +585,7 @@ const GameBoardMultiplayer = ({ gameId, playerIndex, playerName, initialGame }) 
 
             <div className="text-center">
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => globalThis.location.reload()}
                 className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-lg"
               >
                 Új játék

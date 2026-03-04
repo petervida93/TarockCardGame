@@ -50,6 +50,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/games', (req, res) => {
   const games = Array.from(gameController.games.values())
     .filter(game => {
+      // Legalább 1 csatlakozott játékos kell
+      const connectedCount = game.players.filter(p => p.socketId && !p.disconnected).length;
+      if (connectedCount === 0) return false;
+      
       // Csak azok a játékok, ahol lehet csatlakozni:
       // - waiting státuszú játékok
       // - vagy olyan játékok, ahol van disconnected játékos
@@ -243,9 +247,12 @@ io.on('connection', (socket) => {
           playerName
         });
         
-        // Ha a játék még várakozó állapotban van és MINDENKI kilépett, töröljük
-        if (game.status === 'waiting' && game.players.every(p => p.disconnected || p.name === 'Várakozik...')) {
-          console.log(`All players disconnected from waiting game ${gameId}, deleting...`);
+        // Ha MINDENKI kilépett (mind disconnected vagy "Várakozik..."), töröljük a játékot
+        const allDisconnected = game.players.every(p => 
+          p.disconnected === true || p.name === 'Várakozik...'
+        );
+        if (allDisconnected) {
+          console.log(`All players disconnected from game ${gameId}, deleting...`);
           gameController.deleteGame(gameId);
         }
       }

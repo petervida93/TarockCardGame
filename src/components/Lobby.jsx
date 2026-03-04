@@ -24,7 +24,8 @@ const Lobby = ({ onGameStart }) => {
     try {
       const response = await fetch('http://localhost:3001/api/games');
       const games = await response.json();
-      setAvailableGames(games.filter(g => g.status === 'waiting'));
+      // A backend már csak a csatlakozható játékokat küldi (waiting vagy disconnected játékossal)
+      setAvailableGames(games);
     } catch (err) {
       console.error('Failed to fetch games:', err);
     }
