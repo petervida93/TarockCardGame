@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tarock-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tarock_user
+      POSTGRES_PASSWORD: tarock_password
+      POSTGRES_DB: tarock_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tarock-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tarock-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://tarock_user:tarock_password@postgres:5432/tarock_db
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - tarock-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  tarock-network:
+    driver: bridge

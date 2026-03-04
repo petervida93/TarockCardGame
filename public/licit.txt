@@ -1,0 +1,49 @@
+
+Minden licitálás akkor ér véget, ha 3 egymást követő passz történik,
+vagy ha a legalacsonyabb (szóló) licitálást tartotta valaki.
+Tekintsünk el a kombinációktól, tehát a licitálás tartását 3 játékosnál nem
+különböztetjük meg(ha "A" játékos licitál, mindegy melyik másik játékos tartja, nincs különbség)
+
+Licit példa körök:
+
+1. 3-as játék esetén a licitet nyerő játékos 3 lapot kap a talonból, a többi játékos 1-1 lapot.
+
+	1.1 
+	Egyik játékos hármast licitál, többi játékos passzol
+	Licitet nyeri a licitáló játékos.
+	
+	1.2
+	Egyik játékos hármast licitál, egy másik játékos tartja, ezután mindenki passzol
+	Licitet nyeri a licitet tartó játékos.
+	
+	
+2. 2-es játék esetén a  licitet nyerő játékos 2 lapot kap a talonból, az őt követő játékos 2-lapot kap, a többi játékos 1-1 lapot.
+
+Ide kétféleképpen juthatunk: 
+2.1.Egy játékos licitált 3-ast és egy játékos tartotta. 
+	2.1.1 Kettest licitál egy játékos, többi passzol, licitet nyeri a kettest licitáló játékos.
+	2.1.2 Kettest licitál egy játékos, egy másik játékos tartja, ezután mindenki passzol. Licitet nyeri a kettest tartó játékos.
+2.2 Egy játékos licitált, egy tartotta, és egy harmadik 2-es licitált.
+	2.2.1 Mindenki passzol: licitet nyerte az a játékos aki a 2-est licitálta.
+	2.2.2 Egy másik játékos tartja a kettest, többiek passzolnak: licitet nyerte a tartó játékos.
+
+3. 1-es játék esetén a licitet nyerő játékos 1 lapot kap a talonból, az őt követő két játékos 2-2 lapot, a negyedik játékos 1 lapot.
+
+Az előző licitálókörből kétféleképpen juthatunk ide:
+3.1. Egy játékos licitált 2-est és egy játékos tartotta.
+	3.1.1 Egyest licitál a játékos, a többiek passozlnak: licitet nyeri az egyest licitáló játékos.
+	3.1.2 Egyest licitál a játékos, a másik licitáló játékos tartja, a többiek passzolnak: licitet nyeri az egyest tartó játékos.
+3.2 Hárman licitáltak, és egy játékos 1-est licitált.
+	3.2.1 Mindenki passzol: licitet nyeri az egyest licitáló játékos.
+	3.2.2 Tartja egy játékos: licitet nyeri a tartó játékos.
+	
+4. Szóló játék esetén a licitet nyerő játékos 0 lapot kap a talonból, a többi játékos 2-2-2 lapot.
+
+Az előző licitálókörből kétféleképpen juthatunk ide:
+4.1 Egy játékos licitált 1-est és egy játékos tartotta.
+	4.1.1 Szólót licitál a játékos, a többiek passozlnak: licitet nyeri a szólót licitáló játékos.
+	4.1.2 Szólót licitál a játékos, egy másik licitáló játékos tartja, a többiek passzolnak: licitet nyeri a szólót tartó játékos.
+4.2 Hárman licitáltak, és egy játékos szólót licitált.
+	4.2.1 Mindenki passzol: licitet nyeri a szólót licitáló játékos.
+	4.2.2 Egy másik licitáló játékos tartja, a többiek passzolnak: licitet nyeri a szólót tartó játékos.
+	
